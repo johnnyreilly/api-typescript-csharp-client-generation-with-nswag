@@ -121,6 +121,24 @@ Back in the root of our project we're going to initialise an npm project. We're 
 
 Now we're going add some dependencies which our scripts will use: `npm install cpx cross-env npm-run-all start-server-and-test`
 
+We'll also add ourselves some `scripts` to our `package.json`:
+
+```json
+  "scripts": {
+    "postinstall": "npm run install:server-app",
+    "install:server-app": "cd src/server-app/API && dotnet restore",
+    "start:server-app": "cross-env ASPNETCORE_URLS=http://*:5000 ASPNETCORE_ENVIRONMENT=Development dotnet watch --project src/server-app/API run --no-launch-profile"
+  }
+```
+
+Now, running `npm install` will not only install dependencies for our root `package.json`, thanks to our `postinstall` and `install:server-app` scripts it will install the .NET dependencies as well. Running `npm run start:server-app` will start a .NET server at [http://localhost:5000](http://localhost:5000) (passing some environment variables with [`cross-env`](https://github.com/kentcdodds/cross-env) ).  Swagger can be found at [http://localhost:5000/swagger/index.html](http://localhost:5000/swagger/index.html):
+
+![swagger screenshot](assets/swagger.png)
+
+
+
+
+
 Let's spin up the app and see what we have:
 
 

@@ -5,9 +5,9 @@ Generating clients for APIs is a tremendous way to reduce the amount of work you
 > The NSwag project provides tools to generate OpenAPI specifications from existing ASP.NET Web API controllers and client code from these OpenAPI specifications.
 > The project combines the functionality of Swashbuckle (OpenAPI/Swagger generation) and AutoRest (client generation) in one toolchain. 
 
-There's some great posts out there that show you how to generate the clients with NSwag using an `nswag.json` file. This is a really great approach and [Sander Aernouts](https://github.com/sanderaernouts) has a [couple of great posts on this](https://github.com/sanderaernouts/autogenerate-api-client-with-nswag).
+There's some great posts out there that show you how to generate the clients with NSwag using an `nswag.json` file directly from a .NET project.
 
-However, what if you want to use NSwag purely for its client generation capabilities? You may have an API that exposes a Swagger endpoint that you simply wish to create a client for.  How do you do that?  Also, if you want to do some special customisation of the clients you're generating, you may find yourself struggling to configure that in `nswag.json`. In that case, it's possible to hook into NSwag directly to do this with a simple .NET console app.
+However, what if you want to use NSwag purely for its client generation capabilities? You may have an API written with another language / platform that exposes a Swagger endpoint, that you simply wish to create a client for.  How do you do that?  Also, if you want to do some special customisation of the clients you're generating, you may find yourself struggling to configure that in `nswag.json`. In that case, it's possible to hook into NSwag directly to do this with a simple .NET console app.
 
 This post will:
 

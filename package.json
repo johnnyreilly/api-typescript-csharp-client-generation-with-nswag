@@ -4,8 +4,19 @@
   "description": "Generating clients for APIs is a tremendous way to reduce the amount of work you have to do when you're building a web project.  Why handwrite that code when it can be auto-generated for you by a tool like [NSwag](https://github.com/RicoSuter/NSwag)?",
   "main": "index.js",
   "scripts": {
-    "postinstall": "npm run install:server-app",
+    "postinstall": "npm run install:client-app && npm run install:server-app",
+    "install:client-app": "cd src/client-app && npm install",
     "install:server-app": "cd src/server-app/API && dotnet restore",
+    "build": "npm run build:client-app && npm run build:server-app",
+    "build:client-app": "cd src/client-app && npm run build",
+    "postbuild:client-app": "cpx \"src/client-app/build/**/*.*\" \"src/server-app/API/wwwroot/\"",
+    "build:server-app": "cd src/server-app/API && dotnet build --configuration release",
+    "generate-client:server-app": "start-server-and-test generate-client:server-app:serve http-get://localhost:5000/swagger/v1/swagger.json generate-client:server-app:generate",
+    "generate-client:server-app:serve": "cross-env ASPNETCORE_URLS=http://*:5000 ASPNETCORE_ENVIRONMENT=Development dotnet run --project src/server-app/API --no-launch-profile",
+    "generate-client:server-app:generatecs": "dotnet run --project src/server-app/ApiClientGenerator http://localhost:5000/swagger/v1/swagger.json clients.cs CSharp",
+    "generate-client:server-app:generate": "dotnet run --project src/server-app/ApiClientGenerator http://localhost:5000/swagger/v1/swagger.json src/client-app/src/clients.ts TypeScript",
+    "start": "run-p start:client-app start:server-app",
+    "start:client-app": "cd src/client-app && npm start",
     "start:server-app": "cross-env ASPNETCORE_URLS=http://*:5000 ASPNETCORE_ENVIRONMENT=Development dotnet watch --project src/server-app/API run --no-launch-profile"
   },
   "repository": {

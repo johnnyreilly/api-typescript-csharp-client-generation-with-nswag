@@ -1,29 +1,31 @@
 # Generate TypeScript and CSharp clients with NSwag based on an API
 
-Generating clients for APIs is a tremendous way to reduce the amount of work you have to do when you're building a web project.  Why handwrite that code when it can be auto-generated for you by a tool like [NSwag](https://github.com/RicoSuter/NSwag)? To quote the docs:
+Generating clients for APIs is a tremendous way to reduce the amount of work you have to do when you're building a project.  Why handwrite that code when it can be auto-generated for you quickly and accurately by a tool like [NSwag](https://github.com/RicoSuter/NSwag)? To quote the docs:
 
 > The NSwag project provides tools to generate OpenAPI specifications from existing ASP.NET Web API controllers and client code from these OpenAPI specifications.
 > The project combines the functionality of Swashbuckle (OpenAPI/Swagger generation) and AutoRest (client generation) in one toolchain. 
 
 There's some great posts out there that show you how to generate the clients with NSwag using an `nswag.json` file. This is a really great approach and [Sander Aernouts](https://github.com/sanderaernouts) has a [couple of great posts on this](https://github.com/sanderaernouts/autogenerate-api-client-with-nswag).
 
-However, if you want to do some special customisation of the clients you're generating, you may find yourself struggling to configure that in `nswag.json`. In that case, it's possible to hook into NSwag directly to do this with a simple console app.
+However, what if you want to use NSwag purely for its client generation capabilities? You may have an API that exposes a Swagger endpoint that you simply wish to create a client for.  How do you do that?  Also, if you want to do some special customisation of the clients you're generating, you may find yourself struggling to configure that in `nswag.json`. In that case, it's possible to hook into NSwag directly to do this with a simple .NET console app.
 
 This post will:
 
 - Create a .NET API which exposes a Swagger endpoint. (Alternatively, you could use any other Swagger endpoint; [for example an Express API](https://blog.logrocket.com/documenting-your-express-api-with-swagger/).)
-- Create a .NET console app which can create both TypeScript and CSharp clients from a Swagger endpoint
-- Consume that API in simple TypeScript front end
+- Create a .NET console app which can create both TypeScript and CSharp clients from a Swagger endpoint.
+- Create a script which, when run, creates a TypeScript client.
+- Consume that API in a simple TypeScript application.
 
 You will need both [Node.js](https://nodejs.org/en/) and the [.NET SDK](https://dotnet.microsoft.com/download) installed.
 
 #### Create an API
 
-To create an API which exposes a [Swagger / Open API](https://swagger.io/resources/open-api/) endpoint, we'll drop to the command line and enter the following commands:
+We'll now create an API which exposes a [Swagger / Open API](https://swagger.io/resources/open-api/) endpoint.  Whilst we're doing that we'll create a TypeScript React app which we'll use later on. We'll drop to the command line and enter the following commands:
 
 ```shell
 mkdir src
 cd src
+npx create-react-app client-app --template typescript
 mkdir server-app
 cd server-app
 dotnet new api -o API
@@ -31,7 +33,7 @@ cd API
 dotnet add package NSwag.AspNetCore
 ```
 
-We'll replace the `Startup.cs` that's been generated with the following:
+We now have a .NET API with a dependency on NSwag. We'll start to use it by replacing the `Startup.cs` that's been generated with the following:
 
 ```cs
 using Microsoft.AspNetCore.Builder;
@@ -125,22 +127,134 @@ We'll also add ourselves some `scripts` to our `package.json`:
 
 ```json
   "scripts": {
-    "postinstall": "npm run install:server-app",
+    "postinstall": "npm run install:client-app && npm run install:server-app",
+    "install:client-app": "cd src/client-app && npm install",
     "install:server-app": "cd src/server-app/API && dotnet restore",
+    "build": "npm run build:client-app && npm run build:server-app",
+    "build:client-app": "cd src/client-app && npm run build",
+    "postbuild:client-app": "cpx \"src/client-app/build/**/*.*\" \"src/server-app/API/wwwroot/\"",
+    "build:server-app": "cd src/server-app/API && dotnet build --configuration release",
+    "start": "run-p start:client-app start:server-app",
+    "start:client-app": "cd src/client-app && npm start",
     "start:server-app": "cross-env ASPNETCORE_URLS=http://*:5000 ASPNETCORE_ENVIRONMENT=Development dotnet watch --project src/server-app/API run --no-launch-profile"
   }
 ```
 
-Now, running `npm install` will not only install dependencies for our root `package.json`, thanks to our `postinstall` and `install:server-app` scripts it will install the .NET dependencies as well. Running `npm run start:server-app` will start a .NET server at [http://localhost:5000](http://localhost:5000) (passing some environment variables with [`cross-env`](https://github.com/kentcdodds/cross-env) ).  Swagger can be found at [http://localhost:5000/swagger/index.html](http://localhost:5000/swagger/index.html):
+Let's walk through what the above scripts provide us with:
+
+- Running `npm install` in the root of our project will not only install dependencies for our root `package.json`, thanks to our `postinstall`, `install:client-app` and `install:server-app` scripts it will install the React app and .NET app dependencies as well.
+- Running `npm run build` will build our client and server apps.
+- Running `npm run start` will start both our React app and our .NET app.  Our React at will be started at [http://localhost:3000](http://localhost:3000). Our .NET app will be started at [http://localhost:5000](http://localhost:5000) (some environment variables are passed to it with [`cross-env`](https://github.com/kentcdodds/cross-env) ).
+
+Once `npm run start` has been run, you will find a Swagger endpoint at [http://localhost:5000/swagger](http://localhost:5000/swagger):
 
 ![swagger screenshot](assets/swagger.png)
 
+#### The client generator project
 
+Now we've scaffolded our Swagger-ed API, we want to put together the console app that will generate our typed clients.
 
+```shell
+cd src/server-app
+dotnet new console -o APIClientGenerator
+cd APIClientGenerator
+dotnet add package NSwag.CodeGeneration.CSharp
+dotnet add package NSwag.CodeGeneration.TypeScript
+dotnet add package NSwag.Core
+```
 
+We now have a console app with dependencies on the code generation portions of NSwag. Now let's change up `Program.cs` to make use of this:
 
-Let's spin up the app and see what we have:
+```cs
+using System;
+using System.IO;
+using System.Threading.Tasks;
+using NJsonSchema;
+using NJsonSchema.CodeGeneration.TypeScript;
+using NJsonSchema.Visitors;
+using NSwag;
+using NSwag.CodeGeneration.CSharp;
+using NSwag.CodeGeneration.TypeScript;
 
+namespace APIClientGenerator
+{
+    class Program
+    {
+        static async Task Main(string[] args)
+        {
+            if (args.Length != 3)
+                throw new ArgumentException("Expecting 3 arguments: URL, generatePath, language");
 
+            var url = args[0];
+            var generatePath = Path.Combine(Directory.GetCurrentDirectory(), args[1]);
+            var language = args[2];
 
-We now have an API to test with.  Please note, we're using .NET for our
+            if (language != "TypeScript" && language != "CSharp")
+                throw new ArgumentException("Invalid language parameter; valid values are TypeScript and CSharp");
+
+            if (language == "TypeScript") 
+                await GenerateTypeScriptClient(url, generatePath);
+            else
+                await GenerateCSharpClient(url, generatePath);
+        }
+
+        async static Task GenerateTypeScriptClient(string url, string generatePath) =>
+            await GenerateClient(
+                document: await OpenApiDocument.FromUrlAsync(url),
+                generatePath: generatePath,
+                generateCode: (OpenApiDocument document) =>
+                {
+                    var settings = new TypeScriptClientGeneratorSettings();
+                    
+                    settings.TypeScriptGeneratorSettings.TypeStyle = TypeScriptTypeStyle.Interface;
+                    settings.TypeScriptGeneratorSettings.TypeScriptVersion = 3.5M;
+                    settings.TypeScriptGeneratorSettings.DateTimeType = TypeScriptDateTimeType.String;
+
+                    var generator = new TypeScriptClientGenerator(document, settings);
+                    var code = generator.GenerateFile();
+
+                    return code;
+                }
+            );
+
+        async static Task GenerateCSharpClient(string url, string generatePath) =>
+            await GenerateClient(
+                document: await OpenApiDocument.FromUrlAsync(url),
+                generatePath: generatePath,
+                generateCode: (OpenApiDocument document) =>
+                {
+                    var settings = new CSharpClientGeneratorSettings
+                    {
+                        UseBaseUrl = false
+                    };
+
+                    var generator = new CSharpClientGenerator(document, settings);
+                    var code = generator.GenerateFile();
+                    return code;
+                }
+            );
+
+        private async static Task GenerateClient(OpenApiDocument document, string generatePath, Func<OpenApiDocument, string> generateCode)
+        {
+            Console.WriteLine($"Generating {generatePath}...");
+
+            var code = generateCode(document);
+
+            await System.IO.File.WriteAllTextAsync(generatePath, code);
+        }
+    }
+}
+```
+
+We've created ourselves a simple .NET console application that expects three arguments:
+
+- `url` - the url of the `swagger.json` file to generate a client for.
+- `generatePath` - the path where the generated client file should be placed, relative to this project.
+- `language` - the language of the client to generate; valid values are "TypeScript" and "CSharp".
+
+To create a TypeScript client with it then we'd use the following command:
+
+```shell
+dotnet run --project src/server-app/APIClientGenerator http://localhost:5000/swagger/v1/swagger.json src/client-app/src/clients.ts TypeScript
+```
+

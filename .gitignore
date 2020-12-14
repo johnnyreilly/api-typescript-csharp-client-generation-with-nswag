@@ -104,3 +104,6 @@ dist
 
 # TernJS port file
 .tern-port
+
+# Include VS Code assets
+!.vscode

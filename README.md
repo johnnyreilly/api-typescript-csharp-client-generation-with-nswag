@@ -144,7 +144,7 @@ Let's walk through what the above scripts provide us with:
 
 - Running `npm install` in the root of our project will not only install dependencies for our root `package.json`, thanks to our `postinstall`, `install:client-app` and `install:server-app` scripts it will install the React app and .NET app dependencies as well.
 - Running `npm run build` will build our client and server apps.
-- Running `npm run start` will start both our React app and our .NET app.  Our React at will be started at [http://localhost:3000](http://localhost:3000). Our .NET app will be started at [http://localhost:5000](http://localhost:5000) (some environment variables are passed to it with [`cross-env`](https://github.com/kentcdodds/cross-env) ).
+- Running `npm run start` will start both our React app and our .NET app.  Our React app will be started at [http://localhost:3000](http://localhost:3000). Our .NET app will be started at [http://localhost:5000](http://localhost:5000) (some environment variables are passed to it with [`cross-env`](https://github.com/kentcdodds/cross-env) ).
 
 Once `npm run start` has been run, you will find a Swagger endpoint at [http://localhost:5000/swagger](http://localhost:5000/swagger):
 
@@ -246,7 +246,7 @@ namespace APIClientGenerator
 }
 ```
 
-We've created ourselves a simple .NET console application that expects three arguments:
+We've created ourselves a simple .NET console application that creates TypeScript and CSharp clients for a given Swagger URL.  It expects three arguments:
 
 - `url` - the url of the `swagger.json` file to generate a client for.
 - `generatePath` - the path where the generated client file should be placed, relative to this project.
@@ -258,3 +258,98 @@ To create a TypeScript client with it then we'd use the following command:
 dotnet run --project src/server-app/APIClientGenerator http://localhost:5000/swagger/v1/swagger.json src/client-app/src/clients.ts TypeScript
 ```
 
+However, for this to run successfully, we'll first have to ensure the API is running.  It would be great if we had a single command we could run that would:
+
+- bring up the API
+- generate a client
+- bring down the API
+
+Let's make that.
+
+#### Building a "make a client" script
+
+In the root of the project we're going to add the following `scripts`:
+
+```json
+    "generate-client:server-app": "start-server-and-test generate-client:server-app:serve http-get://localhost:5000/swagger/v1/swagger.json generate-client:server-app:generate",
+    "generate-client:server-app:serve": "cross-env ASPNETCORE_URLS=http://*:5000 ASPNETCORE_ENVIRONMENT=Development dotnet run --project src/server-app/API --no-launch-profile",
+    "generate-client:server-app:generate": "dotnet run --project src/server-app/APIClientGenerator http://localhost:5000/swagger/v1/swagger.json src/client-app/src/clients.ts TypeScript",
+```
+
+Let's walk through what's happening here. Running `npm run generate-client:server-app` will:
+
+- Use the [`start-server-and-test`](https://github.com/bahmutov/start-server-and-test) package to spin up our server-app by running the `generate-client:server-app:serve` script.
+- `start-server-and-test` waits for the swagger endpoint to start responding to requests. When it does start responding, `start-server-and-test` runs the `generate-client:server-app:generate` script which runs our APIClientGenerator console app and provides it with the URL where our swagger can be found, the path of the file to generate and the language of "TypeScript"
+
+If you were wanting to generate a C# client (say if you were writing a [Blazor](https://blog.logrocket.com/js-free-frontends-blazor/) app) then you could change the `generate-client:server-app:generate` script as follows:
+
+```json
+   "generate-client:server-app:generate": "dotnet run --project src/server-app/ApiClientGenerator http://localhost:5000/swagger/v1/swagger.json clients.cs CSharp",
+```
+
+#### Consume our generated API client
+
+Let's run the `npm run generate-client:server-app` command.  It creates a `clients.ts` file which nestles nicely inside our `client-app`. We're going to exercise that in a moment. First of all, let's enable proxying from our `client-app` to our `server-app` following the instructions in the [Create React App docs](https://create-react-app.dev/docs/proxying-api-requests-in-development/) and adding the following to our `client-app/package.json`:
+
+```json
+  "proxy": "http://localhost:5000"
+```
+
+Now let's start our apps with `npm run start`.  We'll then replace the contents of `App.tsx` with:
+
+```tsx
+import React from "react";
+import "./App.css";
+import { WeatherForecast, WeatherForecastClient } from "./clients";
+
+function App() {
+  const [weather, setWeather] = React.useState<WeatherForecast[] | null>();
+  React.useEffect(() => {
+    async function loadWeather() {
+      const weatherClient = new WeatherForecastClient(/* baseUrl */ "");
+      const forecast = await weatherClient.get();
+      setWeather(forecast);
+    }
+    loadWeather();
+  }, [setWeather]);
+
+  return (
+    <div className="App">
+      <header className="App-header">
+        {weather ? (
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Summary</th>
+                <th>Centigrade</th>
+                <th>Fahrenheit</th>
+              </tr>
+            </thead>
+            <tbody>
+              {weather.map(({ date, summary, temperatureC, temperatureF }) => (
+                <tr key={date}>
+                  <td>{new Date(date).toLocaleDateString()}</td>
+                  <td>{summary}</td>
+                  <td>{temperatureC}</td>
+                  <td>{temperatureF}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (
+          <p>Loading weather...</p>
+        )}
+      </header>
+    </div>
+  );
+}
+
+export default App;
+```
+
+Inside the `React.useEffect` above you can see we create a new instance of the auto-generated `WeatherForecastClient`.  We then call `weatherClient.get()` which sends the `GET` request to the server to acquire the data and provides it in a strongly typed fashion (`get()` returns an array of `WeatherForecast`). This is then displayed on the page like so:
+
+![load data from server](assets/use-generated-client.gif)
+
+As you an see we're loading data from the server using our auto-generated client.  We're reducing the amount of code we have to write *and* we're reducing the likelihood of errors.

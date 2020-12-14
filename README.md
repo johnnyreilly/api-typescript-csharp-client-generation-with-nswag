@@ -116,7 +116,7 @@ namespace API
 
 The significant changes in the above `Startup.cs` are:
 
-1. Exposing a Swagger endpoint with `UseOpenApi` and `UseSwaggerUi3`.  NSwag will automagically create swagger endpoints in your application for all your controllers. The .NET template ships with a `WeatherForecastController`.
+1. Exposing a Swagger endpoint with `UseOpenApi` and `UseSwaggerUi3`.  NSwag will automagically create Swagger endpoints in your application for all your controllers. The .NET template ships with a `WeatherForecastController`.
 2. Allowing [Cross-Origin Requests (CORS)](https://docs.microsoft.com/en-us/aspnet/core/security/cors) which is useful during development (and will facilitate a demo later).
 
 Back in the root of our project we're going to initialise an npm project. We're going to use this to put in place a number of handy [`npm scripts`](https://docs.npmjs.com/cli/v6/using-npm/scripts) that will make our project easier to work with. So we'll `npm init` and accept all the defaults.
@@ -279,7 +279,7 @@ In the root of the project we're going to add the following `scripts`:
 Let's walk through what's happening here. Running `npm run generate-client:server-app` will:
 
 - Use the [`start-server-and-test`](https://github.com/bahmutov/start-server-and-test) package to spin up our server-app by running the `generate-client:server-app:serve` script.
-- `start-server-and-test` waits for the swagger endpoint to start responding to requests. When it does start responding, `start-server-and-test` runs the `generate-client:server-app:generate` script which runs our APIClientGenerator console app and provides it with the URL where our swagger can be found, the path of the file to generate and the language of "TypeScript"
+- `start-server-and-test` waits for the Swagger endpoint to start responding to requests. When it does start responding, `start-server-and-test` runs the `generate-client:server-app:generate` script which runs our APIClientGenerator console app and provides it with the URL where our swagger can be found, the path of the file to generate and the language of "TypeScript"
 
 If you were wanting to generate a C# client (say if you were writing a [Blazor](https://blog.logrocket.com/js-free-frontends-blazor/) app) then you could change the `generate-client:server-app:generate` script as follows:
 

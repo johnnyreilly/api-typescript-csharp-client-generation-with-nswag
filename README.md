@@ -14,7 +14,7 @@ This post will:
 - Create a .NET API which exposes a Swagger endpoint. (Alternatively, you could use any other Swagger endpoint; [for example an Express API](https://blog.logrocket.com/documenting-your-express-api-with-swagger/).)
 - Create a .NET console app which can create both TypeScript and CSharp clients from a Swagger endpoint.
 - Create a script which, when run, creates a TypeScript client.
-- Consume that API in a simple TypeScript application.
+- Consume the API using the generated client in a simple TypeScript application.
 
 You will need both [Node.js](https://nodejs.org/en/) and the [.NET SDK](https://dotnet.microsoft.com/download) installed.
 

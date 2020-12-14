@@ -20,7 +20,7 @@ You will need both [Node.js](https://nodejs.org/en/) and the [.NET SDK](https://
 
 #### Create an API
 
-We'll now create an API which exposes a [Swagger / Open API](https://swagger.io/resources/open-api/) endpoint.  Whilst we're doing that we'll create a TypeScript React app which we'll use later on. We'll drop to the command line and enter the following commands:
+We'll now create an API which exposes a [Swagger / Open API](https://swagger.io/resources/open-api/) endpoint.  Whilst we're doing that we'll create a TypeScript React app which we'll use later on. We'll drop to the command line and enter the following commands which use the .NET SDK, node and the `create-react-app` package:
 
 ```shell
 mkdir src
